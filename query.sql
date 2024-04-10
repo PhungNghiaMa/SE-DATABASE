@@ -258,21 +258,27 @@ group by PW.LastUpdatedDate;
 
 -- INSERT OR UDPATE PRODUCT_WAREHOUSE TABLE 
 CREATE OR REPLACE PROCEDURE insert_reorder_product(
-    NEWWID int,
-    NEWPID varchar(100),
+    InputWarehouseName varchar(100),
+    InputProductName varchar(100),
     NEWQuantity int
 )
     LANGUAGE plpgsql
 AS $$
+
 BEGIN
     DECLARE
         existing_record RECORD;
+        NeededPID varchar(100);
+        NeededWID int;
     BEGIN
         -- Check if product exists in the warehouse
+        -- SELECT PID WHICH SAME WITH CORRESPONDING PNAME TO INSERT / UPDATE TO Product_Warehouse table
+        SELECT Product.PID INTO NeededPID from Product WHERE InputProductName = Product.Pname;
+        SELECT Warehouse.WID INTO NeededWID from Warehouse WHERE InputWarehouseName = Warehouse.WName;
         SELECT *  -- Selects all columns from Product_Warehouse
         INTO existing_record
         FROM Product_Warehouse
-        WHERE pid = NEWPID AND wid = NEWWID;
+        WHERE pid = NeededPID AND wid = NeededWID;
 
         IF FOUND THEN
             -- Update quantity and status based on existing record
@@ -281,25 +287,24 @@ BEGIN
                 SET quantity = quantity + NEWQuantity,
                     lastupdateddate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY'),
                     lastupdatedtime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS'), status = 'Out of Stock'
-                WHERE PID = NEWPID AND WID = NEWWID;
-            ELSIF existing_record.quantity + NEWQuantity < (SELECT MinimumStockLevel FROM Product WHERE PID = NEWPID) THEN
+                WHERE PID = NeededPID AND WID = NeededWID;
+            ELSIF existing_record.quantity + NEWQuantity < 10 THEN
                 UPDATE Product_Warehouse
                 SET quantity = quantity + NEWQuantity,
                     lastupdateddate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY'),
                     lastupdatedtime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS'), status = 'Low Stock'
-                WHERE PID = NEWPID AND WID = NEWWID;
+                WHERE PID = NeededPID AND WID = NeededWID;
             ELSE
                 UPDATE Product_Warehouse
                 SET quantity = quantity + NEWQuantity,
                     lastupdateddate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY'),
                     lastupdatedtime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS'), status = 'In Stock'
-                WHERE PID = NEWPID AND WID = NEWWID;
+                WHERE PID = NeededPID AND WID = NeededWID;
         END IF;
         ELSE
             -- Insert new record if product doesn't exist
             INSERT INTO Product_Warehouse(WID, PID, Quantity)
-            VALUES (NEWWID, NEWPID, NEWQuantity);
-
+            VALUES (NeededWID, NeededPID, NEWQuantity);
         END IF;
     EXCEPTION WHEN NO_DATA_FOUND THEN
         -- Handle the case where no product is found (optional)
