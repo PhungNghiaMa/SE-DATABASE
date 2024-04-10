@@ -1,23 +1,41 @@
-- CREATE TRIGGER TO UPDATE THE STATUS AND  THE LAST DATE TO UPDATE TO Product_Warehouse table
+-- CREATE TRIGGER TO UPDATE THE STATUS AND  THE LAST DATE TO UPDATE TO Product_Warehouse table
+-- USE TRIGGER TO UPDATE to table Prodcut_Warehouse. In the Order , after click to Add Order , The system will automatically set the Status base on the logic set by dev , the LastUpdatedDate and LastUpdatedTime are also updated
+--     automatically by the time and date the user pressed the Add Order button. UPDATE in CRUD
 CREATE OR REPLACE FUNCTION update_product_warehouse_status()
     RETURNS trigger AS $$
+    DECLARE CurrentTime varchar(100);
 BEGIN
-    IF NEW.Quantity <= 0 THEN
-UPDATE Product_Warehouse
-SET status = 'Out of Stock', LastUpdatedDate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY') ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
-
-WHERE PID = NEW.PID AND WID = NEW.WID;
-ELSEIF NEW.Quantity < 10 THEN
-UPDATE Product_Warehouse
-SET status = 'Low Stock' , LastUpdatedDate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY') ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
-
-WHERE PID = NEW.PID AND WID = NEW.WID;
-ELSE
-UPDATE Product_Warehouse
-SET status = 'In Stock', LastUpdatedDate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY') ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
-WHERE PID = NEW.PID AND WID = NEW.WID;
-END IF;
-RETURN NEW;
+        SELECT LastUpdatedDate INTO CurrentTime FROM Product_Warehouse WHERE WID = NEW.WID AND PID = NEW.PID;
+        IF CurrentTime IS  NULL THEN
+            IF NEW.Quantity <= 0 THEN
+                UPDATE Product_Warehouse
+                SET status = 'Out of Stock', LastUpdatedDate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY') ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
+                WHERE PID = NEW.PID AND WID = NEW.WID;
+            ELSEIF NEW.Quantity < (SELECT minimumStockLevel FROM Product WHERE Product.PID = NEW.PID) THEN
+                UPDATE Product_Warehouse
+                SET status = 'Low Stock' , LastUpdatedDate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY') ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
+                WHERE PID = NEW.PID AND WID = NEW.WID;
+            ELSE
+                UPDATE Product_Warehouse
+                SET status = 'In Stock', LastUpdatedDate = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7', 'DD/MM/YYYY') ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
+                WHERE PID = NEW.PID AND WID = NEW.WID;
+            END IF;
+       ELSE
+            IF NEW.Quantity <= 0 THEN
+                UPDATE Product_Warehouse
+                SET status = 'Out of Stock', LastUpdatedDate = CurrentTime ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
+                WHERE PID = NEW.PID AND WID  = NEW.WID;
+            ELSEIF new.Quantity < 10 THEN
+                UPDATE Product_Warehouse
+                SET status = 'Low Stock',  LastUpdatedDate = CurrentTime ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
+                WHERE PID = NEW.PID AND WID  = NEW.WID;
+            ELSE
+                UPDATE Product_Warehouse
+                SET status = 'In Stock',  LastUpdatedDate = CurrentTime ,LastUpdatedTime = to_char(LOCALTIMESTAMP AT TIME ZONE 'GMT+7','HH24:MI:SS')
+                WHERE PID = NEW.PID AND WID  = NEW.WID;
+            end if;
+        end if;
+        RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -27,28 +45,39 @@ CREATE TRIGGER trigger_update_warehouse_status
     EXECUTE PROCEDURE update_product_warehouse_status();
 
 
--- CREATE PROCEDURE TO FIND TOTAL ORDER OF SPECIFIC WAREHOUSE EACH MONTH
+-- format date ( RETURN THE VALUE OF INPUT IN TYPE OF VARCHAR ) (READ in CRUD) ( this is just use if the user want to set the Date for the Product inserted to the Product_Warehouse in another but not the current date when the user
+-- press the button Add Order)
+CREATE OR REPLACE FUNCTION format_date(date_input DATE)
+    RETURNS VARCHAR
+AS $$
+BEGIN
+    RETURN (TO_CHAR(date_input, 'DD') || '/' || TO_CHAR(date_input, 'MM') || '/' || TO_CHAR(date_input, 'YYYY'));
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- CREATE PROCEDURE TO FIND TOTAL ORDER OF SPECIFIC WAREHOUSE in current  MONTH ( RETURN THE VALUE OF TOTAL ORDER BY current MONTH OF SPECIFIC WAREHOUSE ) ( CREATE and READ in CRUD ) --> 
 CREATE OR REPLACE PROCEDURE Total_Order_By_Month(NEWWID int)
 LANGUAGE plpgsql
 AS $$
     DECLARE CurrentExportDate TIMESTAMP;
 BEGIN
-SELECT  COUNT(*) AS Total_Orders_Current_Month
+SELECT  COUNT(*) AS Total_Orders_Current_Month  -- CREATE DATA TO TAKE THE Number of Orders 
 FROM Export
 WHERE EXTRACT(MONTH FROM current_timestamp) = EXTRACT(MONTH FROM Export.ExportDate) AND WID = NEWWID
 GROUP BY TO_CHAR(current_timestamp, 'Month');
 end;
-    $$;
+$$;
 
 
--- Count total order of all warehouse order by each month
+-- Count total order of all warehouse order by each month. This is CREATE and READ in CRUD. USE this to get the Total of all warehouse and then return the value of total order to show in Dashboard
 SELECT TO_CHAR(current_timestamp, 'Month') AS Current_Month,
        COUNT(*) AS Total_Orders_Current_Month
 FROM Export
 WHERE EXTRACT(MONTH FROM current_timestamp) = EXTRACT(MONTH FROM Export.ExportDate)
 GROUP BY TO_CHAR(current_timestamp, 'Month');
 
--- count all of type
+-- count all of typeus4e CREATE and READ in CRUD. This is use to select all of type and return the value to update on Types in 
 SELECT COUNT(*) AS total_types
 FROM Type;
 
