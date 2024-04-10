@@ -5,6 +5,7 @@ CREATE TABLE Product (
                          SupplierID int,
                          CostPrice decimal(5,2),
                          UnitPrice decimal(5,2),
+                         MinimumStockLevel int,
                          FOREIGN KEY (SupplierID) REFERENCES Supplier(SupplierID)
 );
 
@@ -35,8 +36,6 @@ CREATE TABLE Product_Warehouse (
                                    PRIMARY KEY (WID, PID)
 );
 
-
--- Create Order table
 CREATE TABLE Product_Order (
                                OrderID int PRIMARY KEY,
                                WID int ,
@@ -64,7 +63,8 @@ CREATE TABLE Product_Category (
                                   PRIMARY KEY (PID, TID)
 );
 
--- Có thể có hoặc không
+-- Improved In_transition table (renamed, uses separate source and destination)
+-- có thể có hoăc không 
 -- CREATE TABLE Product_Transfer (  -- Renamed for clarity
 --                                   SourceWID int,
 --                                   DestinationWID int ,
@@ -82,7 +82,7 @@ CREATE TABLE Export(
                        PID varchar(100),
                        EID varchar(100),
                        ExportQuantity int,
-                       ExportDate date,
+                       ExportDate varchar(200),
                        PRIMARY KEY(EID),
                        FOREIGN KEY(PID) REFERENCES Product(PID),
                        FOREIGN KEY (WID) REFERENCES Warehouse(WID)
