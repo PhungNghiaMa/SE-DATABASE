@@ -51,7 +51,7 @@ CREATE TABLE Product_Order (
                                FOREIGN KEY(WID) REFERENCES Warehouse(WID),
                                FOREIGN KEY(PID) REFERENCES Product(PID),
                                FOREIGN KEY(SupplierID) REFERENCES Supplier(SupplierID) ,
-                               FOREIGN KEY (Order_Detail_ID) REFERENCES Order_Detail(Order_ID),
+                               FOREIGN KEY (Order_Detail_ID) REFERENCES Order_Detail(CodeOrder),
                                OrderDate varchar(200),
                                OrderQuantity int
 );
@@ -76,18 +76,22 @@ CREATE TRIGGER auto_increment_order_id
     BEFORE INSERT ON Product_Order
     FOR EACH ROW EXECUTE PROCEDURE auto_increment_order_id();
 
+
 drop trigger auto_increment_order_id ON Product_Order
 
 drop table Product_Order;
 
 CREATE TABLE Order_Detail(
-    Order_ID  int,
+    CodeOrder  int,
     SupplierName varchar(200),
     Order_Detail_Date varchar(200),
-    PRIMARY KEY (Order_ID)
+    PRIMARY KEY (CodeOrder)
 );
+drop table Order_Detail;
+drop table Product_Order;
 
 INSERT INTO Order_Detail(SupplierName,Order_Detail_Date) VALUES ('A','2024/04/11');
+INSERT INTO Order_Detail(SupplierName,Order_Detail_Date) VALUES ('B','2024/04/11');
 select * from Order_Detail;
 
 INSERT INTO Product_Order ( WID, PID, SupplierID,Order_Detail_ID, OrderQuantity)
@@ -96,21 +100,25 @@ INSERT INTO Product_Order ( WID, PID, SupplierID,Order_Detail_ID, OrderQuantity)
 VALUES ( 2, 'PRD003', 103,1, 12);
 INSERT INTO Product_Order ( WID, PID, SupplierID,Order_Detail_ID, OrderQuantity)
 VALUES ( 2, 'PRD003', 103,2, 12);
-SELECT * FROM Product_Order WHERE ;
+INSERT INTO Product_Order ( WID, PID, SupplierID,Order_Detail_ID, OrderQuantity)
+VALUES ( 2, 'PRD004', 103,2, 12);
+INSERT INTO Product_Order ( WID, PID, SupplierID,Order_Detail_ID, OrderQuantity)
+VALUES ( 2, 'PRD004', 103,(SELECT Order_Detail FROM Order_Detail), 12);
+SELECT * FROM Product_Order WHERE Order_Detail_ID = 1 ;
 truncate table Order_Detail;
 truncate table Product_Order;
 ----------
-CREATE OR REPLACE FUNCTION auto_increment_order_id() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION auto_increment_Code_order() RETURNS TRIGGER AS $$
 DECLARE
     current_id INT;
 BEGIN
-    SELECT COALESCE(MAX(Order_ID), 0) + 1 INTO current_id
+    SELECT COALESCE(MAX(CodeOrder), 0) + 1 INTO current_id
     FROM Order_Detail;
 
     IF current_id IS NULL THEN  -- Handle first record case
-        NEW.Order_ID := 1;
+        NEW.CodeOrder := 1;
     ELSE
-        NEW.Order_ID := current_id;
+        NEW.CodeOrder := current_id;
     END IF;
     RETURN NEW;
 END;
@@ -118,8 +126,9 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER auto_increment_order_id
     BEFORE INSERT ON Order_Detail
-    FOR EACH ROW EXECUTE PROCEDURE auto_increment_order_id();
+    FOR EACH ROW EXECUTE PROCEDURE auto_increment_Code_order();
 
+INSERT INTO Order_Detail()
 --------------------------------------
 
 CREATE OR REPLACE FUNCTION update_order_date() RETURNS TRIGGER AS $$
